@@ -13,7 +13,7 @@
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     
     <!-- Load Babel for JSX -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -45,7 +45,7 @@
             animation: fadeInUp 0.3s ease-out forwards;
         }
 
-        /* เพิ่มการตั้งค่าสำหรับระบบการสั่งพิมพ์ (Print) */
+        /* Print styles */
         @media print {
             @page {
                 size: A4;
@@ -59,7 +59,6 @@
             .no-print {
                 display: none !important;
             }
-            /* ปลดล็อกการวางตำแหน่งเพื่อให้สามารถ Print ได้หลายหน้า */
             .print-modal-overlay {
                 position: absolute !important;
                 top: 0 !important;
@@ -82,9 +81,6 @@
                 transform: none !important;
                 animation: none !important;
             }
-            .print-p-0 {
-                padding: 0 !important;
-            }
         }
     </style>
 </head>
@@ -92,7 +88,7 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
+        const { useState, useEffect } = React;
 
         const initialOrders = [
             {
@@ -115,6 +111,7 @@
                 group: "Internal",
                 status: "COMPLETED",
                 createdAt: "25/9/2569 08:30:00",
+                pickerName: "สมชาย ใจดี",
                 items: [
                     { id: 1, customer: "ฝ่ายผลิต - Line A", name: "SULFURIC ACID 98% (BULK)", qty: 5000, unit: "L", batch: "SA-2609A", location: "Tank-01", bpCatalog: "RM-SA98", deliveryType: "ท่อส่ง (Pipeline)" },
                     { id: 2, customer: "ฝ่ายผลิต - Line A", name: "WATER (RO)", qty: 10000, unit: "L", batch: "-", location: "Tank-05", bpCatalog: "RM-H2O", deliveryType: "ท่อส่ง (Pipeline)" }
@@ -122,7 +119,6 @@
             }
         ];
 
-        // Icons Component (Fixed missing closing quotes and tags)
         const Icons = {
             Print: () => (
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -169,13 +165,6 @@
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
                     <polyline points="22 4 12 14.01 9 11.01"></polyline>
-                </svg>
-            ),
-            ClipboardCheck: () => (
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
-                    <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
-                    <polyline points="9 14 11 16 15 12"></polyline>
                 </svg>
             ),
             ChartBar: () => (
@@ -225,7 +214,6 @@
             )
         };
 
-        // ฟังก์ชันแปลงวันที่ภาษาไทย (พ.ศ.) ให้เป็น Date Object เพื่อใช้เปรียบเทียบ
         const parseThaiDate = (dateStr) => {
             if (!dateStr) return new Date();
             const [datePart] = dateStr.split(' ');
@@ -241,7 +229,6 @@
             const [exportType, setExportType] = useState('ALL');
             const [exportMessage, setExportMessage] = useState({ text: '', type: '' });
 
-            // สถิติเบื้องต้น
             const totalOrders = orders.length;
             const pendingOrders = orders.filter(o => o.status === 'PENDING').length;
             const completedOrders = orders.filter(o => o.status === 'COMPLETED').length;
@@ -250,6 +237,7 @@
                 SALE: orders.filter(o => o.type === 'SALE').length,
                 PRODUCTION: orders.filter(o => o.type === 'PRODUCTION').length,
                 FG_TRANSFER: orders.filter(o => o.type === 'FG_TRANSFER').length,
+                SAMPLE: orders.filter(o => o.type === 'SAMPLE').length,
             };
 
             const handleExportCSV = () => {
@@ -278,7 +266,7 @@
                 csvContent += "รหัสเอกสาร,ประเภทเอกสาร,สถานะ,ลูกค้า/ผู้เบิก,วันที่สร้าง,ผู้จัดสินค้า,ลำดับรายการ,ชื่อสินค้า,จำนวน,หน่วย,Location,Batch No.,BP Catalog Name,ประเภทการจัดส่ง\n";
 
                 filtered.forEach(order => {
-                    const orderType = order.type === 'SALE' ? 'ขาย' : order.type === 'PRODUCTION' ? 'ผลิต' : 'ย้ายคลัง';
+                    const orderType = order.type === 'SALE' ? 'ขาย' : order.type === 'PRODUCTION' ? 'ผลิต' : order.type === 'SAMPLE' ? 'สินค้าตัวอย่าง' : 'ย้ายคลัง';
                     const orderStatus = order.status === 'COMPLETED' ? 'จัดเสร็จสิ้น' : 'รอจัด';
                     const customer = `"${order.customerName || '-'}"`;
                     const picker = `"${order.pickerName || '-'}"`;
@@ -309,7 +297,6 @@
 
             return (
                 <div className="space-y-6 animate-fade-in-up">
-                    {/* สถิติ */}
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
                             <h3 className="text-sm font-medium text-gray-500 mb-1">ใบเบิกทั้งหมด</h3>
@@ -326,11 +313,11 @@
                         <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col justify-center">
                             <div className="flex justify-between text-sm mb-2"><span className="text-blue-600 font-medium">ขาย (Sales)</span> <span>{typeStats.SALE}</span></div>
                             <div className="flex justify-between text-sm mb-2"><span className="text-purple-600 font-medium">ผลิต (RM)</span> <span>{typeStats.PRODUCTION}</span></div>
-                            <div className="flex justify-between text-sm"><span className="text-amber-600 font-medium">ย้ายคลัง (FG)</span> <span>{typeStats.FG_TRANSFER}</span></div>
+                            <div className="flex justify-between text-sm mb-2"><span className="text-amber-600 font-medium">ย้ายคลัง (FG)</span> <span>{typeStats.FG_TRANSFER}</span></div>
+                            <div className="flex justify-between text-sm"><span className="text-teal-600 font-medium">ตัวอย่าง (Sample)</span> <span>{typeStats.SAMPLE}</span></div>
                         </div>
                     </div>
 
-                    {/* กล่อง Export */}
                     <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
                         <div className="flex justify-between items-center mb-4">
                             <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
@@ -354,6 +341,7 @@
                                     <option value="SALE">ขาย (Sales Order)</option>
                                     <option value="PRODUCTION">ผลิต (RM Withdrawal)</option>
                                     <option value="FG_TRANSFER">ย้ายคลัง (FG Transfer)</option>
+                                    <option value="SAMPLE">สินค้าตัวอย่าง (Sample Product)</option>
                                 </select>
                             </div>
                             <div>
@@ -388,7 +376,6 @@
             );
         };
 
-        // ฟังก์ชันสร้างโครงสร้าง HTML สำหรับการพรีวิวและการพิมพ์
         const generateOrderContent = (order) => {
             if (!order) return '';
             
@@ -398,6 +385,14 @@
             
             const getPrefix = () => order.type === 'SALE' ? 'บจ. ' : '';
             
+            // สร้าง URL สำหรับ QR Code จากรหัสเอกสาร
+            const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(order.id)}`;
+            
+            const getStatusBadgeHtml = () => {
+                if (order.status === 'COMPLETED') return `<span style="background-color: #d1fae5; color: #065f46; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; margin-left: 4px;">จัดเสร็จสิ้น</span>`;
+                return `<span style="background-color: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; margin-left: 4px;">รอจัดสินค้า</span>`;
+            };
+
             let itemsHtml = order.items.map((item, index) => `
                 <tr>
                     <td style="padding: 10px; border: 1px solid #e5e7eb; text-align: center;">${index + 1}</td>
@@ -412,25 +407,40 @@
             `).join('');
 
             return `
-                <div style="font-family: 'Sarabun', sans-serif; max-width: 1000px; margin: 0 auto; color: #374151;">
-                    <h1 style="font-size: 24px; font-weight: bold; margin-bottom: 16px; color: #111827;">${order.documentName}</h1>
-                    <hr style="border-top: 2px solid #111827; margin-bottom: 24px;" />
+                <div style="font-family: 'Sarabun', sans-serif; max-width: 1000px; margin: 0 auto; color: #374151; background: white; padding: 20px; border-radius: 8px;">
                     
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 24px; font-size: 15px;">
+                    <!-- ส่วนหัวของใบเบิก -->
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #e5e7eb; padding-bottom: 16px; margin-bottom: 16px;">
                         <div>
-                            <p style="margin: 4px 0;"><strong>${order.type === 'SALE' ? 'ลูกค้า' : 'ผู้เบิก/แผนก'}:</strong> ${getPrefix()}${order.customerName}</p>
-                            <p style="margin: 4px 0;"><strong>กลุ่มบริษัท:</strong> ${order.group}</p>
-                            <p style="margin: 4px 0;"><strong>${order.type === 'SALE' ? 'SO ID' : 'Doc ID'}:</strong> <span style="color: #4b5563;">${order.id}</span></p>
+                            <h2 style="font-size: 22px; font-weight: bold; color: #1f2937; margin: 0;">${order.documentName}</h2>
+                            <p style="font-size: 14px; color: #6b7280; margin: 4px 0 0 0;">VSC Inventory Hub</p>
                         </div>
-                        <div style="text-align: right;">
-                            <p style="margin: 4px 0;"><strong>วันที่สร้าง:</strong> ${order.createdAt}</p>
-                            ${order.status === 'COMPLETED' && order.pickerName ? `<p style="margin: 4px 0;"><strong>ผู้จัดสินค้า:</strong> <span style="color: #ea580c; font-weight: 600;">${order.pickerName}</span></p>` : ''}
+                        
+                        <!-- ส่วนแสดง QR Code ประจำใบเบิก -->
+                        <div style="display: flex; flex-direction: column; align-items: center; background-color: #f9fafb; padding: 8px; border: 1px solid #e5e7eb; border-radius: 6px;">
+                            <img src="${qrCodeUrl}" alt="Order QR Code" style="width: 96px; height: 96px;" />
+                            <span style="font-size: 12px; font-family: monospace; margin-top: 6px; color: #4b5563;">${order.id}</span>
                         </div>
                     </div>
 
-                    <hr style="border-top: 1px dashed #d1d5db; margin-bottom: 24px;" />
+                    <!-- ข้อมูลรายละเอียดใบเบิก -->
+                    <div style="display: flex; gap: 16px; margin-bottom: 24px; font-size: 14px;">
+                        <div style="flex: 1;">
+                            <p style="margin: 6px 0;"><strong style="color: #4b5563;">ประเภท:</strong> ${order.type}</p>
+                            <p style="margin: 6px 0;"><strong style="color: #4b5563;">${order.type === 'SALE' ? 'ลูกค้า' : 'ผู้เบิก/แผนก'}:</strong> ${getPrefix()}${order.customerName}</p>
+                            <p style="margin: 6px 0;"><strong style="color: #4b5563;">กลุ่มบริษัท:</strong> ${order.group}</p>
+                        </div>
+                        <div style="flex: 1;">
+                            <p style="margin: 6px 0;"><strong style="color: #4b5563;">วันที่สร้าง:</strong> ${order.createdAt}</p>
+                            <p style="margin: 6px 0; display: flex; align-items: center;">
+                                <strong style="color: #4b5563;">สถานะ:</strong> 
+                                ${getStatusBadgeHtml()}
+                            </p>
+                            ${order.status === 'COMPLETED' && order.pickerName ? `<p style="margin: 6px 0;"><strong style="color: #4b5563;">ผู้จัดสินค้า:</strong> <span style="color: #ea580c; font-weight: 600;">${order.pickerName}</span></p>` : ''}
+                        </div>
+                    </div>
 
-                    <h3 style="font-size: 18px; font-weight: bold; margin-bottom: 12px; color: #111827;">รายการสินค้า (${order.items.length} รายการ)</h3>
+                    <h3 style="font-size: 16px; font-weight: bold; margin-bottom: 12px; color: #111827;">รายการสินค้า (${order.items.length} รายการ)</h3>
                     
                     <table style="width: 100%; border-collapse: collapse; font-size: 14px; text-align: left; margin-bottom: 24px;">
                         <thead>
@@ -450,7 +460,7 @@
                         </tbody>
                     </table>
                     
-                    <div style="font-size: 13px; color: #6b7280; margin-top: 24px;">พิมพ์เมื่อ: ${printTime}</div>
+                    <div style="font-size: 12px; color: #9ca3af; text-align: right; margin-top: 32px;">พิมพ์เมื่อ: ${printTime}</div>
                 </div>
             `;
         };
@@ -479,8 +489,6 @@
                         </html>
                     `);
                     printWindow.document.close();
-                    
-                    // หน่วงเวลาให้เบราว์เซอร์โหลดฟอนต์ สักครู่ก่อนเรียก print
                     setTimeout(() => {
                         printWindow.focus();
                         printWindow.print();
@@ -534,14 +542,13 @@
             );
         };
 
-        const CreateOrderModal = ({ onClose, onSave }) => {
-            const [customerName, setCustomerName] = useState('');
-            const [type, setType] = useState('SALE');
-            const [group, setGroup] = useState('VSC');
-            const [items, setItems] = useState([]);
+        const CreateOrderModal = ({ onClose, onSave, initialOrder = null, orders = [] }) => {
+            const [customerName, setCustomerName] = useState(initialOrder ? initialOrder.customerName : '');
+            const [type, setType] = useState(initialOrder ? initialOrder.type : 'SALE');
+            const [group, setGroup] = useState(initialOrder ? initialOrder.group : 'VSC');
+            const [items, setItems] = useState(initialOrder ? initialOrder.items : []);
             const [pasteMessage, setPasteMessage] = useState('');
 
-            // ฟังก์ชันสำหรับจัดการข้อมูลที่วางจาก Excel แบบวิเคราะห์คอลัมน์อัตโนมัติ (Auto-Mapping)
             const handlePaste = (e) => {
                 e.preventDefault();
                 const clipboardData = e.clipboardData || window.clipboardData;
@@ -553,60 +560,48 @@
                 const newItems = [];
                 let foundCustomer = '';
 
-                // 1. หาจำนวนคอลัมน์สูงสุด เพื่อวิเคราะห์รูปแบบที่ผู้ใช้ก๊อปปี้มา
-                const maxCols = Math.max(...rows.map(r => r.split('\t').length));
+                let headerColMap = null;
 
-                // 2. หาบรรทัดที่เป็นข้อมูลจริงๆ (ข้าม Header)
-                let dataRow = null;
-                for (const row of rows) {
-                    const cols = row.split('\t');
-                    if (cols.some(c => c && (c.includes('รายการสินค้า') || c.includes('จำนวน')))) continue;
-                    if (cols.length >= 3) { dataRow = cols; break; }
-                }
-
-                if (!dataRow) return;
-
-                // ฟังก์ชันตรวจสอบว่าเป็นตัวเลขลำดับหรือไม่
-                const isIndex = (val) => /^\d+$/.test(val ? val.trim() : '');
-
-                // 3. สร้าง Mapping ว่าข้อมูลแต่ละฟิลด์อยู่คอลัมน์ที่เท่าไหร่
-                let colMap = { customer: -1, item: -1, qty: -1, unit: -1, batch: -1, location: -1, bp: -1, delivery: -1 };
-
-                if (maxCols >= 9) {
-                    // กรณี 9 คอลัมน์ครบ: ลำดับ | ลูกค้า | สินค้า | จำนวน | Unit | Batch | Location | BP | จัดส่ง
-                    colMap = { customer: 1, item: 2, qty: 3, unit: 4, batch: 5, location: 6, bp: 7, delivery: 8 };
-                } else if (maxCols === 8) {
-                    // กรณี 8 คอลัมน์ (ขาด ลำดับ หรือ ลูกค้า)
-                    if (isIndex(dataRow[0])) {
-                        // มี 'ลำดับ' แต่ไม่มี 'ลูกค้า'
-                        colMap = { customer: -1, item: 1, qty: 2, unit: 3, batch: 4, location: 5, bp: 6, delivery: 7 };
-                    } else {
-                        // ไม่มี 'ลำดับ' แต่มี 'ลูกค้า'
-                        colMap = { customer: 0, item: 1, qty: 2, unit: 3, batch: 4, location: 5, bp: 6, delivery: 7 };
-                    }
-                } else {
-                    // กรณี 7 คอลัมน์หรือน้อยกว่า (ไม่มีทั้ง ลำดับ และ ลูกค้า ขึันต้นด้วย สินค้าเลย)
-                    colMap = { customer: -1, item: 0, qty: 1, unit: 2, batch: 3, location: 4, bp: 5, delivery: 6 };
-                }
-
-                // 4. ดึงข้อมูลตาม Mapping ที่วิเคราะห์ได้
                 rows.forEach((row, index) => {
-                    const cols = row.split('\t');
-                    if (cols.some(c => c && (c.includes('รายการสินค้า') || c.includes('ลำดับ')))) return; // ข้าม Header
+                    const cols = row.split('\t').map(c => c.trim());
 
-                    // ดึงค่าตามคอลัมน์ ถ้าไม่มีให้ใช้ค่า Default
-                    const getVal = (idx, def) => (idx !== -1 && cols[idx]) ? cols[idx].trim() : def;
+                    // ตรวจจับแถว Header เพื่อหาตําแหน่ง Column ที่แน่นอน
+                    if (!headerColMap && cols.some(c => c.includes('รายการสินค้า') || c.includes('จำนวน') || c.includes('ลูกค้า'))) {
+                        headerColMap = {
+                            customer: cols.findIndex(c => c.includes('ลูกค้า')),
+                            item: cols.findIndex(c => c.includes('รายการสินค้า')),
+                            qty: cols.findIndex(c => c.includes('จำนวน')),
+                            unit: cols.findIndex(c => c.includes('Unit') || c.includes('หน่วย')),
+                            batch: cols.findIndex(c => c.includes('Batch') || c.includes('Batch Att.')),
+                            location: cols.findIndex(c => c.includes('Location')),
+                            bp: cols.findIndex(c => c.includes('BP Catalog')),
+                            delivery: cols.findIndex(c => c.includes('จัดส่ง') || c.includes('ประเภทการจัดส่ง'))
+                        };
+                        return; // ข้ามแถว Header
+                    }
+
+                    // ถ้าไม่มี Header แถวแรก ให้ใช้การเดาตามโครงสร้างมาตรฐาน
+                    let colMap = headerColMap || {
+                        customer: 0,
+                        item: 1,
+                        qty: 2,
+                        unit: 3,
+                        batch: 4,
+                        location: 5,
+                        bp: 6,
+                        delivery: 7
+                    };
+
+                    const getVal = (idx, def) => (idx !== -1 && cols[idx] !== undefined && cols[idx] !== '') ? cols[idx] : def;
 
                     const customer = getVal(colMap.customer, '');
-                    // ดึงชื่อลูกค้ามาเก็บไว้ (ถ้ามี)
-                    if (customer && !foundCustomer && customer !== '-') {
+                    if (customer && !foundCustomer && customer !== '-' && !customer.includes('ลูกค้า')) {
                         foundCustomer = customer;
                     }
 
                     const itemName = getVal(colMap.item, '');
-                    if (!itemName) return; // ถ้าไม่มีชื่อสินค้าข้ามบรรทัดนี้
+                    if (!itemName || itemName.includes('รายการสินค้า')) return;
 
-                    // จัดการจำนวน
                     let qtyStr = getVal(colMap.qty, '0').replace(/,/g, '');
                     let parsedQty = parseFloat(qtyStr) || 0;
 
@@ -624,14 +619,13 @@
 
                 if (newItems.length > 0) {
                     setItems(prev => [...prev, ...newItems]);
-                    
-                    // อัปเดตชื่อลูกค้าในช่อง Input ด้านบนอัตโนมัติ
                     if (foundCustomer) {
                         setCustomerName(foundCustomer);
                     }
-
                     setPasteMessage(`เพิ่มสำเร็จ ${newItems.length} รายการ!`);
                     setTimeout(() => setPasteMessage(''), 3000);
+                } else {
+                    alert('ไม่พบข้อมูลรายการสินค้าที่ถูกต้อง กรุณาตรวจสอบรูปแบบตารางที่ก๊อปปี้');
                 }
             };
 
@@ -659,23 +653,49 @@
                 const docNames = {
                     'SALE': 'ใบสั่งขาย (Sales Order)',
                     'PRODUCTION': 'ใบเบิกวัตถุดิบ (Raw Material Withdrawal)',
-                    'FG_TRANSFER': 'ใบโอนย้ายสินค้าสำเร็จรูป (FG Transfer)'
+                    'FG_TRANSFER': 'ใบโอนย้ายสินค้าสำเร็จรูป (FG Transfer)',
+                    'SAMPLE': 'ใบเบิกสินค้าตัวอย่าง (Sample Request)'
                 };
 
-                const prefix = type === 'SALE' ? 'SO-' : type === 'PRODUCTION' ? 'PRD-' : 'TR-';
+                const prefix = type === 'SALE' ? 'SO-' : type === 'PRODUCTION' ? 'PRD-' : type === 'SAMPLE' ? 'SMP-' : 'TR-';
                 
+                // --- ระบบรันเลขเอกสารอัตโนมัติ (Sequential ID Generation) ---
+                let finalDocumentId = '';
+                if (initialOrder) {
+                    finalDocumentId = initialOrder.id; // กรณีแก้ไข ใช้ ID เดิม
+                } else {
+                    // กรองเอาเฉพาะเอกสารประเภทเดียวกัน
+                    const typeOrders = orders.filter(o => o.type === type);
+                    let lastIdNumber = 0; // ค่าเริ่มต้นถ้าไม่มีข้อมูล
+                    
+                    if (typeOrders.length > 0) {
+                        // ดึงเฉพาะตัวเลขจาก ID แล้วหาค่าสูงสุด (Max)
+                        const numericIds = typeOrders.map(o => {
+                            const numericPart = parseInt(o.id.replace(prefix, ''), 10);
+                            return isNaN(numericPart) ? 0 : numericPart;
+                        });
+                        lastIdNumber = Math.max(...numericIds);
+                    }
+                    
+                    const nextIdNumber = lastIdNumber + 1;
+                    // สร้าง ID ใหม่ และเติม 0 ข้างหน้าให้ครบ 4 หลัก (เช่น SO-0001, PRD-0002)
+                    finalDocumentId = `${prefix}${nextIdNumber.toString().padStart(4, '0')}`;
+                }
+                // --------------------------------------------------------
+
                 const now = new Date();
                 const thaiYear = now.getFullYear() + 543;
                 const formattedDate = `${now.getDate()}/${now.getMonth() + 1}/${thaiYear} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
 
                 const newOrder = {
-                    id: prefix + Date.now().toString().slice(-4),
+                    id: finalDocumentId,
                     type: type,
                     documentName: docNames[type],
                     customerName: customerName || 'ลูกค้าทั่วไป',
                     group: group || '-',
-                    status: 'PENDING',
-                    createdAt: formattedDate,
+                    status: initialOrder ? initialOrder.status : 'PENDING',
+                    createdAt: initialOrder ? initialOrder.createdAt : formattedDate,
+                    pickerName: initialOrder ? initialOrder.pickerName : undefined,
                     items: items.map((item, index) => ({ ...item, id: index + 1, customer: customerName }))
                 };
                 
@@ -688,7 +708,8 @@
                         
                         <div className="flex justify-between items-center p-4 border-b border-gray-200">
                             <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                                <Icons.Plus /> สร้างใบเบิกใหม่
+                                {initialOrder ? <Icons.Edit /> : <Icons.Plus />} 
+                                {initialOrder ? `แก้ไขเอกสาร: ${initialOrder.id}` : 'สร้างใบเบิกใหม่'}
                             </h2>
                             <button onClick={onClose} className="text-gray-400 hover:text-gray-700 transition-colors p-1 rounded-full hover:bg-gray-100">
                                 <Icons.Close />
@@ -697,7 +718,6 @@
 
                         <form onSubmit={handleSubmit} className="p-6 flex flex-col gap-6">
                             
-                            {/* General Info */}
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">ประเภทเอกสาร</label>
@@ -705,19 +725,29 @@
                                         <option value="SALE">ขาย (Sales Order)</option>
                                         <option value="PRODUCTION">ผลิต (RM Withdrawal)</option>
                                         <option value="FG_TRANSFER">ย้ายคลัง (FG Transfer)</option>
+                                        <option value="SAMPLE">สินค้าตัวอย่าง (Sample Product)</option>
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">{type === 'SALE' ? 'ชื่อลูกค้า' : 'แผนก/ผู้เบิก'}</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">{type === 'SALE' || type === 'SAMPLE' ? 'ชื่อลูกค้า/ผู้เบิก' : 'แผนก/ผู้เบิก'}</label>
                                     <input type="text" required value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder="เช่น บจ. นาสโตะ หรือ ฝ่ายผลิต" className="w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">กลุ่มบริษัท</label>
-                                    <input type="text" value={group} onChange={e => setGroup(e.target.value)} className="w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
+                                    <select value={group} onChange={e => setGroup(e.target.value)} className="w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                                        <option value="VSC">VSC</option>
+                                        <option value="VSST">VSST</option>
+                                        <option value="VSI">VSI</option>
+                                        <option value="อื่นๆ">อื่นๆ</option>
+                                        <option value="-">ไม่ระบุ (-)</option>
+                                        {/* หากมีค่า group เดิมที่ไม่อยู่ในลิสต์ ให้แสดงขึ้นมาด้วย */}
+                                        {group !== 'VSC' && group !== 'Internal' && group !== 'External' && group !== 'Affiliate' && group !== '-' && (
+                                            <option value={group}>{group}</option>
+                                        )}
+                                    </select>
                                 </div>
                             </div>
 
-                            {/* Excel Paste Area */}
                             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                                 <div className="flex items-center justify-between mb-2">
                                     <h3 className="text-sm font-bold text-blue-800 flex items-center gap-2">
@@ -726,20 +756,18 @@
                                     {pasteMessage && <span className="text-green-600 font-bold text-sm animate-pulse">{pasteMessage}</span>}
                                 </div>
                                 <p className="text-xs text-blue-600 mb-2">
-                                    <b>เคล็ดลับ:</b> คุณสามารถก๊อปปี้ข้อมูลจาก Excel มาวางได้เลย! <br/>
-                                    ระบบรองรับคอลัมน์: <b>(ลำดับ) | (ลูกค้า) | รายการสินค้า | จำนวน | Unit | Batch Att. | Location | BP Catalog | การจัดส่ง</b> <br/>
-                                    <span className="text-red-500">*</span> หาก Excel ของคุณไม่มีคอลัมน์ 'ลำดับ' หรือ 'ลูกค้า' ระบบจะใช้ AI วิเคราะห์และจัดเรียงช่องให้อัตโนมัติ
+                                    <b>เคล็ดลับ:</b> คลุมดำตาราง Excel แล้วกดก๊อปปี้ (Ctrl+C) จากนั้นคลิกที่กล่องด้านล่างแล้วกดวาง (Ctrl+V) <br/>
+                                    ระบบจะวิเคราะห์คอลัมน์ให้อัตโนมัติและดึงชื่อลูกค้าขึ้นมาด้านบนให้ทันที
                                 </p>
                                 <textarea 
                                     onPaste={handlePaste}
                                     placeholder="คลิกที่นี่ แล้วกด Ctrl+V เพื่อวางข้อมูลจาก Excel" 
                                     className="w-full h-16 border border-blue-300 rounded p-2 text-sm bg-white resize-none focus:ring-2 focus:ring-blue-500 outline-none placeholder-blue-300"
-                                    value="" // Always empty to just act as a paste receiver
-                                    onChange={() => {}} // Dummy to avoid warnings
+                                    value=""
+                                    onChange={() => {}}
                                 ></textarea>
                             </div>
 
-                            {/* Items Table */}
                             <div>
                                 <div className="flex justify-between items-center mb-2">
                                     <h3 className="text-sm font-bold text-gray-800">รายการสินค้า ({items.length})</h3>
@@ -823,16 +851,14 @@
 
         const PickingModal = ({ order, onClose, onComplete }) => {
             const [pickerName, setPickerName] = useState('');
-            const [pickedItems, setPickedItems] = useState([]); // เก็บ index ของรายการที่จัดแล้ว
+            const [pickedItems, setPickedItems] = useState([]);
 
-            // ฟังก์ชันติ๊กเลือกทีละรายการ
             const handleToggleItem = (index) => {
                 setPickedItems(prev => 
                     prev.includes(index) ? prev.filter(i => i !== index) : [...prev, index]
                 );
             };
 
-            // ฟังก์ชันติ๊กเลือกทั้งหมด
             const handleToggleAll = (e) => {
                 e.stopPropagation();
                 if (pickedItems.length === order.items.length) {
@@ -868,7 +894,6 @@
                         </div>
                         
                         <div className="p-6 flex-1 overflow-y-auto">
-                            {/* Progress Bar */}
                             <div className="mb-4">
                                 <div className="flex justify-between items-center mb-1">
                                     <span className="text-sm font-semibold text-gray-700">ความคืบหน้าการจัดสินค้า</span>
@@ -879,7 +904,6 @@
                                 </div>
                             </div>
 
-                            {/* Items Table */}
                             <div className="overflow-x-auto custom-scrollbar border border-gray-200 rounded-lg mb-6 shadow-sm">
                                 <table className="w-full text-left border-collapse text-[14px]">
                                     <thead className="bg-gray-100 sticky top-0 shadow-sm z-10">
@@ -913,7 +937,7 @@
                                                         <input 
                                                             type="checkbox" 
                                                             checked={isPicked} 
-                                                            onChange={() => {}} // Handle click on TR instead
+                                                            onChange={() => {}} 
                                                             className="w-5 h-5 text-orange-600 rounded focus:ring-orange-500 cursor-pointer pointer-events-none"
                                                         />
                                                     </td>
@@ -930,7 +954,6 @@
                                 </table>
                             </div>
 
-                            {/* Picker Input */}
                             <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
                                 <label className="block mb-2 text-sm font-bold text-gray-800">
                                     ลงชื่อผู้จัดสินค้า / พนักงานคลังสินค้า <span className="text-red-500">*</span>
@@ -967,7 +990,6 @@
             );
         };
 
-        // คอมโพเนนต์หน้าต่างจัดการผู้ดูแลระบบ (Admin Panel)
         const AdminManagement = ({ admins, setAdmins }) => {
             const [isEditing, setIsEditing] = useState(false);
             const [currentAdmin, setCurrentAdmin] = useState({ id: '', empId: '', name: '' });
@@ -979,7 +1001,6 @@
                 if (isEditing) {
                     setAdmins(admins.map(a => a.id === currentAdmin.id ? currentAdmin : a));
                 } else {
-                    // ตรวจสอบว่ารหัสซ้ำหรือไม่
                     if (admins.some(a => a.empId === currentAdmin.empId)) {
                         alert('รหัสพนักงานนี้มีในระบบแล้ว!');
                         return;
@@ -1083,13 +1104,16 @@
         };
 
         const App = () => {
-            const [orders, setOrders] = useState(initialOrders);
+            // โหลดข้อมูลเริ่มต้นจาก localStorage ถ้ามีข้อมูลเก่าเซฟไว้ (ถ้าไม่มีให้ใช้ initialOrders)
+            const [orders, setOrders] = useState(() => {
+                const savedOrders = localStorage.getItem('inventory_orders');
+                return savedOrders ? JSON.parse(savedOrders) : initialOrders;
+            });
             const [selectedOrder, setSelectedOrder] = useState(null);
             const [pickingOrder, setPickingOrder] = useState(null);
             const [isCreating, setIsCreating] = useState(false);
+            const [editingOrder, setEditingOrder] = useState(null);
             const [filter, setFilter] = useState('ALL');
-            
-            // สถานะสำหรับการจำลองระบบ Login และจัดการสิทธิ์
             const [admins, setAdmins] = useState([
                 { id: '1', empId: 'ADMIN01', name: 'System Admin' },
                 { id: '2', empId: 'A002', name: 'หัวหน้าคลังสินค้า' }
@@ -1097,7 +1121,7 @@
             const [currentUser, setCurrentUser] = useState(null);
             const [loginInput, setLoginInput] = useState('');
             
-            const [view, setView] = useState('LIST'); // 'LIST', 'DASHBOARD', 'ADMIN_MANAGEMENT'
+            const [view, setView] = useState('LIST');
 
             const filteredOrders = orders.filter(o => filter === 'ALL' || o.type === filter);
 
@@ -1106,6 +1130,7 @@
                     case 'SALE': return 'bg-blue-100 text-blue-800 border-blue-200';
                     case 'PRODUCTION': return 'bg-purple-100 text-purple-800 border-purple-200';
                     case 'FG_TRANSFER': return 'bg-amber-100 text-amber-800 border-amber-200';
+                    case 'SAMPLE': return 'bg-teal-100 text-teal-800 border-teal-200';
                     default: return 'bg-gray-100 text-gray-800';
                 }
             };
@@ -1115,10 +1140,35 @@
                 return <span className="px-2.5 py-1 rounded-full text-xs font-medium border bg-yellow-100 text-yellow-800 border-yellow-200 w-fit">รอจัดสินค้า</span>;
             };
 
-            const handleSaveNewOrder = (newOrder) => {
-                setOrders([newOrder, ...orders]);
-                setIsCreating(false);
+            const handleSaveNewOrder = (savedOrder) => {
+                if (editingOrder) {
+                    setOrders(orders.map(o => o.id === savedOrder.id ? savedOrder : o));
+                    setEditingOrder(null);
+                } else {
+                    setOrders([savedOrder, ...orders]);
+                    setIsCreating(false);
+                }
             };
+
+            const handleDeleteOrder = (id) => {
+                // 1. ถามยืนยันก่อนลบ
+                if (!window.confirm("คุณต้องการลบใบเบิกนี้ใช่หรือไม่?")) return;
+
+                // 2. กรองเอาเฉพาะใบเบิกที่ "ไม่ได้" มี id ตรงกับที่ถูกกดลบ
+                const updatedOrders = orders.filter(order => order.id !== id);
+                
+                // 3. อัปเดต State ของรายการใบเบิก
+                setOrders(updatedOrders);
+
+                // 4. บันทึกข้อมูลใหม่ลงไปใน localStorage ทันที
+                localStorage.setItem('inventory_orders', JSON.stringify(updatedOrders));
+            };
+
+            // อัปเดต localStorage อัตโนมัติทุกครั้งที่ orders มีการเปลี่ยนแปลง 
+            // (ครอบคลุมทั้งตอนสร้างใหม่, แก้ไข, และตอนกดจัดสินค้าเสร็จสิ้น)
+            useEffect(() => {
+                localStorage.setItem('inventory_orders', JSON.stringify(orders));
+            }, [orders]);
 
             const handleLogin = (e) => {
                 e.preventDefault();
@@ -1141,7 +1191,6 @@
                 setView('LIST');
             };
 
-            // หน้าจอ Login
             if (!currentUser) {
                 return (
                     <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
@@ -1180,7 +1229,7 @@
                 );
             }
 
-            const role = currentUser.role;
+            const currentRole = currentUser.role;
 
             return (
                 <div className="min-h-screen flex flex-col bg-gray-50">
@@ -1194,11 +1243,11 @@
                                 <div className="flex items-center gap-4">
                                     <div className="flex flex-col text-right">
                                         <span className="text-sm font-bold text-gray-800">{currentUser.name || currentUser.empId}</span>
-                                        <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full inline-block w-fit ml-auto ${role === 'ADMIN' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>
-                                            {role === 'ADMIN' ? 'สิทธิ์: ผู้ดูแลระบบ' : 'สิทธิ์: คลังสินค้า'}
+                                        <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full inline-block w-fit ml-auto ${currentRole === 'ADMIN' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>
+                                            {currentRole === 'ADMIN' ? 'สิทธิ์: ผู้ดูแลระบบ' : 'สิทธิ์: คลังสินค้า'}
                                         </span>
                                     </div>
-                                    <div className={`h-10 w-10 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-md ${role === 'ADMIN' ? 'bg-blue-600' : 'bg-orange-500'}`}>
+                                    <div className={`h-10 w-10 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-md ${currentRole === 'ADMIN' ? 'bg-blue-600' : 'bg-orange-500'}`}>
                                         {currentUser.empId.substring(0, 1).toUpperCase()}
                                     </div>
                                     <button 
@@ -1211,8 +1260,7 @@
                                 </div>
                             </div>
                             
-                            {/* Navigation Tabs for Admin */}
-                            {role === 'ADMIN' && (
+                            {currentRole === 'ADMIN' && (
                                 <div className="flex gap-6 mt-2 pb-2 overflow-x-auto custom-scrollbar">
                                     <button 
                                         onClick={() => setView('LIST')} 
@@ -1245,18 +1293,18 @@
 
                     <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 no-print">
                         
-                        {role === 'ADMIN' && view === 'DASHBOARD' ? (
+                        {currentRole === 'ADMIN' && view === 'DASHBOARD' ? (
                             <Dashboard orders={orders} />
-                        ) : role === 'ADMIN' && view === 'ADMIN_MANAGEMENT' ? (
+                        ) : currentRole === 'ADMIN' && view === 'ADMIN_MANAGEMENT' ? (
                             <AdminManagement admins={admins} setAdmins={setAdmins} />
                         ) : (
                             <>
                                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
                                     <div>
-                                        <h1 className="text-2xl font-bold text-gray-900">{role === 'ADMIN' && view !== 'WAREHOUSE_LIST' ? 'รายการใบเบิกสินค้า' : 'หน้าจอคลังสินค้า (รอจัด)'}</h1>
-                                        <p className="text-sm text-gray-500 mt-1">{role === 'ADMIN' && view !== 'WAREHOUSE_LIST' ? 'จัดการคำสั่งขาย และใบเบิกวัตถุดิบ/สินค้าสำเร็จรูป' : 'ตรวจสอบและจัดเตรียมสินค้าตามใบสั่งจากแอดมิน'}</p>
+                                        <h1 className="text-2xl font-bold text-gray-900">{currentRole === 'ADMIN' && view !== 'WAREHOUSE_LIST' ? 'รายการใบเบิกสินค้า' : 'หน้าจอคลังสินค้า (รอจัด)'}</h1>
+                                        <p className="text-sm text-gray-500 mt-1">{currentRole === 'ADMIN' && view !== 'WAREHOUSE_LIST' ? 'จัดการคำสั่งขาย และใบเบิกวัตถุดิบ/สินค้าสำเร็จรูป' : 'ตรวจสอบและจัดเตรียมสินค้าตามใบสั่งจากแอดมิน'}</p>
                                     </div>
-                                    {role === 'ADMIN' && view !== 'WAREHOUSE_LIST' && (
+                                    {currentRole === 'ADMIN' && view !== 'WAREHOUSE_LIST' && (
                                         <button 
                                             onClick={() => setIsCreating(true)}
                                             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors"
@@ -1266,105 +1314,123 @@
                                     )}
                                 </div>
 
-                        <div className="flex gap-2 mb-6 overflow-x-auto pb-2 custom-scrollbar">
-                            {['ALL', 'SALE', 'PRODUCTION', 'FG_TRANSFER'].map(fType => (
-                                <button
-                                    key={fType}
-                                    onClick={() => setFilter(fType)}
-                                    className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors border ${
-                                        filter === fType 
-                                        ? 'bg-gray-800 text-white border-gray-800 shadow-sm' 
-                                        : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
-                                    }`}
-                                >
-                                    {fType === 'ALL' ? 'ทั้งหมด' : 
-                                     fType === 'SALE' ? 'ขาย (Sales)' : 
-                                     fType === 'PRODUCTION' ? 'ผลิต (RM)' : 'ย้ายคลัง (FG)'}
-                                </button>
-                            ))}
-                        </div>
+                                <div className="flex gap-2 mb-6 overflow-x-auto pb-2 custom-scrollbar">
+                                    {['ALL', 'SALE', 'PRODUCTION', 'FG_TRANSFER', 'SAMPLE'].map(fType => (
+                                        <button
+                                            key={fType}
+                                            onClick={() => setFilter(fType)}
+                                            className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors border ${
+                                                filter === fType 
+                                                ? 'bg-gray-800 text-white border-gray-800 shadow-sm' 
+                                                : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                                            }`}
+                                        >
+                                            {fType === 'ALL' ? 'ทั้งหมด' : 
+                                             fType === 'SALE' ? 'ขาย (Sales)' : 
+                                             fType === 'PRODUCTION' ? 'ผลิต (RM)' : 
+                                             fType === 'SAMPLE' ? 'สินค้าตัวอย่าง' : 'ย้ายคลัง (FG)'}
+                                        </button>
+                                    ))}
+                                </div>
 
-                        <div className="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left border-collapse">
-                                    <thead>
-                                        <tr className="bg-gray-50 border-b border-gray-200 text-gray-600 text-sm">
-                                            <th className="p-4 font-semibold">รหัสเอกสาร (ID)</th>
-                                            <th className="p-4 font-semibold">สถานะ</th>
-                                            <th className="p-4 font-semibold">ประเภท</th>
-                                            <th className="p-4 font-semibold">ลูกค้า / ผู้เบิก</th>
-                                            <th className="p-4 font-semibold">วันที่สร้าง</th>
-                                            <th className="p-4 font-semibold text-center">จำนวนรายการ</th>
-                                            <th className="p-4 font-semibold text-center">การจัดการ</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-200 text-sm">
-                                        {filteredOrders.length === 0 ? (
-                                            <tr>
-                                                <td colSpan="6" className="p-8 text-center text-gray-500">
-                                                    ไม่มีข้อมูลรายการในหมวดหมู่นี้
-                                                </td>
-                                            </tr>
-                                        ) : (
-                                            filteredOrders.map((order) => (
-                                                <tr key={order.id} className="hover:bg-gray-50 transition-colors">
-                                                    <td className="p-4 font-medium text-gray-900">{order.id}</td>
-                                                    <td className="p-4">
-                                                        {getStatusBadge(order.status)}
-                                                    </td>
-                                                    <td className="p-4">
-                                                        <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${getBadgeColor(order.type)}`}>
-                                                            {order.type === 'SALE' ? 'Sales Order' : order.type === 'PRODUCTION' ? 'RM Withdraw' : 'FG Transfer'}
-                                                        </span>
-                                                    </td>
-                                                    <td className="p-4">
-                                                        <div className="font-medium text-gray-800">{order.customerName}</div>
-                                                        <div className="text-xs text-gray-500">{order.group}</div>
-                                                    </td>
-                                                    <td className="p-4 text-gray-600">{order.createdAt}</td>
-                                                    <td className="p-4 text-center">
-                                                        <span className="bg-gray-100 text-gray-700 py-1 px-3 rounded-full text-xs font-bold">
-                                                            {order.items.length}
-                                                        </span>
-                                                    </td>
-                                                    <td className="p-4 text-center">
-                                                        {role === 'WAREHOUSE' || view === 'WAREHOUSE_LIST' ? (
-                                                            order.status === 'PENDING' ? (
-                                                                <button 
-                                                                    onClick={() => setPickingOrder(order)}
-                                                                    className="text-white font-medium px-4 py-1.5 bg-orange-500 hover:bg-orange-600 rounded-md transition-colors shadow-sm text-sm"
-                                                                >
-                                                                    เริ่มจัดสินค้า
-                                                                </button>
-                                                            ) : (
-                                                                <button 
-                                                                    onClick={() => setSelectedOrder(order)}
-                                                                    className="text-gray-600 hover:text-gray-900 font-medium hover:underline px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded transition-colors text-sm"
-                                                                >
-                                                                    ดูรายละเอียด
-                                                                </button>
-                                                            )
-                                                        ) : (
-                                                            <button 
-                                                                onClick={() => setSelectedOrder(order)}
-                                                                className="text-blue-600 hover:text-blue-800 font-medium hover:underline px-3 py-1 bg-blue-50 hover:bg-blue-100 rounded transition-colors"
-                                                            >
-                                                                เปิดดูพรีวิว
-                                                            </button>
-                                                        )}
-                                                    </td>
+                                <div className="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-left border-collapse">
+                                            <thead>
+                                                <tr className="bg-gray-50 border-b border-gray-200 text-gray-600 text-sm">
+                                                    <th className="p-4 font-semibold">รหัสเอกสาร (ID)</th>
+                                                    <th className="p-4 font-semibold">สถานะ</th>
+                                                    <th className="p-4 font-semibold">ประเภท</th>
+                                                    <th className="p-4 font-semibold">ลูกค้า / ผู้เบิก</th>
+                                                    <th className="p-4 font-semibold">วันที่สร้าง</th>
+                                                    <th className="p-4 font-semibold text-center">จำนวนรายการ</th>
+                                                    <th className="p-4 font-semibold text-center">การจัดการ</th>
                                                 </tr>
-                                            ))
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
+                                            </thead>
+                                            <tbody className="divide-y divide-gray-200 text-sm">
+                                                {filteredOrders.length === 0 ? (
+                                                    <tr>
+                                                        <td colSpan="7" className="p-8 text-center text-gray-500">
+                                                            ไม่มีข้อมูลรายการในหมวดหมู่นี้
+                                                        </td>
+                                                    </tr>
+                                                ) : (
+                                                    filteredOrders.map((order) => (
+                                                        <tr key={order.id} className="hover:bg-gray-50 transition-colors">
+                                                            <td className="p-4 font-medium text-gray-900">{order.id}</td>
+                                                            <td className="p-4">
+                                                                {getStatusBadge(order.status)}
+                                                            </td>
+                                                            <td className="p-4">
+                                                                <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${getBadgeColor(order.type)}`}>
+                                                                    {order.type === 'SALE' ? 'Sales Order' : order.type === 'PRODUCTION' ? 'RM Withdraw' : order.type === 'SAMPLE' ? 'Sample' : 'FG Transfer'}
+                                                                </span>
+                                                            </td>
+                                                            <td className="p-4">
+                                                                <div className="font-medium text-gray-800">{order.customerName}</div>
+                                                                <div className="text-xs text-gray-500">{order.group}</div>
+                                                            </td>
+                                                            <td className="p-4 text-gray-600">{order.createdAt}</td>
+                                                            <td className="p-4 text-center">
+                                                                <span className="bg-gray-100 text-gray-700 py-1 px-3 rounded-full text-xs font-bold">
+                                                                    {order.items.length}
+                                                                </span>
+                                                            </td>
+                                                            <td className="p-4 text-center">
+                                                                <div className="flex items-center justify-center gap-2">
+                                                                    {currentRole === 'WAREHOUSE' || view === 'WAREHOUSE_LIST' ? (
+                                                                        order.status === 'PENDING' ? (
+                                                                            <button 
+                                                                                onClick={() => setPickingOrder(order)}
+                                                                                className="text-white font-medium px-4 py-1.5 bg-orange-500 hover:bg-orange-600 rounded-md transition-colors shadow-sm text-sm"
+                                                                            >
+                                                                                เริ่มจัดสินค้า
+                                                                            </button>
+                                                                        ) : (
+                                                                            <button 
+                                                                                onClick={() => setSelectedOrder(order)}
+                                                                                className="text-gray-600 hover:text-gray-900 font-medium hover:underline px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded transition-colors text-sm"
+                                                                            >
+                                                                                ดูรายละเอียด
+                                                                            </button>
+                                                                        )
+                                                                    ) : (
+                                                                        <>
+                                                                            <button 
+                                                                                onClick={() => setSelectedOrder(order)}
+                                                                                className="text-blue-600 hover:text-blue-800 font-medium hover:underline px-3 py-1 bg-blue-50 hover:bg-blue-100 rounded transition-colors"
+                                                                            >
+                                                                                เปิดดูพรีวิว
+                                                                            </button>
+                                                                            <button 
+                                                                                onClick={() => setEditingOrder(order)}
+                                                                                className="text-amber-500 hover:text-amber-700 p-1.5 bg-amber-50 hover:bg-amber-100 rounded transition-colors"
+                                                                                title="แก้ไขใบเบิก"
+                                                                            >
+                                                                                <Icons.Edit />
+                                                                            </button>
+                                                                            <button 
+                                                                                onClick={() => handleDeleteOrder(order.id)}
+                                                                                className="text-red-500 hover:text-red-700 p-1.5 bg-red-50 hover:bg-red-100 rounded transition-colors"
+                                                                                title="ลบใบเบิก"
+                                                                            >
+                                                                                <Icons.Trash />
+                                                                            </button>
+                                                                        </>
+                                                                    )}
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    ))
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
                             </>
                         )}
                     </main>
 
-                    {/* Modals */}
                     {selectedOrder && (
                         <PreviewModal 
                             order={selectedOrder} 
@@ -1376,6 +1442,16 @@
                         <CreateOrderModal 
                             onClose={() => setIsCreating(false)}
                             onSave={handleSaveNewOrder}
+                            orders={orders}
+                        />
+                    )}
+
+                    {editingOrder && (
+                        <CreateOrderModal 
+                            initialOrder={editingOrder}
+                            onClose={() => setEditingOrder(null)}
+                            onSave={handleSaveNewOrder}
+                            orders={orders}
                         />
                     )}
 
