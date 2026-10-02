@@ -87,6 +87,38 @@
 <body>
     <div id="root"></div>
 
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        
+        if (firebaseConfig && Object.keys(firebaseConfig).length > 0) {
+            const app = initializeApp(firebaseConfig);
+            window.fbDb = getFirestore(app);
+            window.fbAuth = getAuth(app);
+            window.fbHelpers = { collection, doc, setDoc, deleteDoc, onSnapshot };
+            
+            const initAuth = async () => {
+                try {
+                    if (typeof __initial_auth_token !== 'undefined') {
+                        await signInWithCustomToken(window.fbAuth, __initial_auth_token);
+                    } else {
+                        await signInAnonymously(window.fbAuth);
+                    }
+                    window.dispatchEvent(new Event('firebase-ready'));
+                } catch (e) {
+                    console.error("Firebase Auth Error:", e);
+                    window.dispatchEvent(new Event('firebase-ready')); // fallback
+                }
+            };
+            initAuth();
+        } else {
+            window.dispatchEvent(new Event('firebase-ready'));
+        }
+    </script>
+
     <script type="text/babel">
         const { useState, useEffect } = React;
 
@@ -730,7 +762,7 @@
                     group: group || '-',
                     status: initialOrder ? initialOrder.status : 'PENDING',
                     createdAt: initialOrder ? initialOrder.createdAt : formattedDate,
-                    pickerName: initialOrder ? initialOrder.pickerName : undefined,
+                    pickerName: (initialOrder && initialOrder.pickerName) ? initialOrder.pickerName : null,
                     items: items.map((item, index) => ({ ...item, id: index + 1, customer: customerName }))
                 };
                 
@@ -1035,7 +1067,7 @@
             );
         };
 
-        const AdminManagement = ({ admins, setAdmins }) => {
+        const AdminManagement = ({ admins, onSaveAdmin, onDeleteAdmin }) => {
             const [isEditing, setIsEditing] = useState(false);
             const [currentAdmin, setCurrentAdmin] = useState({ id: '', empId: '', name: '' });
             const [dialog, setDialog] = useState(null);
@@ -1045,13 +1077,13 @@
                 if (!currentAdmin.empId.trim()) return;
 
                 if (isEditing) {
-                    setAdmins(admins.map(a => a.id === currentAdmin.id ? currentAdmin : a));
+                    onSaveAdmin(currentAdmin);
                 } else {
                     if (admins.some(a => a.empId === currentAdmin.empId)) {
                         setDialog({ type: 'error', title: 'ข้อผิดพลาด', message: 'รหัสพนักงานนี้มีในระบบแล้ว!', onConfirm: () => setDialog(null) });
                         return;
                     }
-                    setAdmins([...admins, { ...currentAdmin, id: Date.now().toString() }]);
+                    onSaveAdmin({ ...currentAdmin, id: Date.now().toString() });
                 }
                 setCurrentAdmin({ id: '', empId: '', name: '' });
                 setIsEditing(false);
@@ -1068,7 +1100,7 @@
                     title: 'ยืนยันการลบ',
                     message: 'คุณแน่ใจหรือไม่ที่จะลบสิทธิ์ผู้ดูแลระบบของพนักงานท่านนี้?',
                     onConfirm: () => {
-                        setAdmins(admins.filter(a => a.id !== id));
+                        onDeleteAdmin(id);
                         setDialog(null);
                     },
                     onCancel: () => setDialog(null)
@@ -1159,23 +1191,134 @@
         };
 
         const App = () => {
-            const [orders, setOrders] = useState(() => {
-                const savedOrders = localStorage.getItem('inventory_orders');
-                return savedOrders ? JSON.parse(savedOrders) : initialOrders;
-            });
+            const [firebaseReady, setFirebaseReady] = useState(false);
+            const [isSyncing, setIsSyncing] = useState(true);
+            const [orders, setOrders] = useState([]);
+            const [admins, setAdmins] = useState([]);
+            
             const [selectedOrder, setSelectedOrder] = useState(null);
             const [pickingOrder, setPickingOrder] = useState(null);
             const [isCreating, setIsCreating] = useState(false);
             const [editingOrder, setEditingOrder] = useState(null);
             const [filter, setFilter] = useState('ALL');
-            const [admins, setAdmins] = useState([
-                { id: '1', empId: 'ADMIN01', name: 'System Admin' },
-                { id: '2', empId: 'A002', name: 'หัวหน้าคลังสินค้า' }
-            ]);
             const [currentUser, setCurrentUser] = useState(null);
             const [loginInput, setLoginInput] = useState('');
             const [view, setView] = useState('LIST');
             const [dialog, setDialog] = useState(null);
+
+            useEffect(() => {
+                const handleReady = () => setFirebaseReady(true);
+                if (window.fbDb && window.fbAuth?.currentUser) {
+                    setFirebaseReady(true);
+                } else if (!window.fbDb) {
+                    setFirebaseReady(true);
+                } else {
+                    window.addEventListener('firebase-ready', handleReady);
+                }
+                return () => window.removeEventListener('firebase-ready', handleReady);
+            }, []);
+
+            useEffect(() => {
+                if (!firebaseReady) return;
+                
+                if (!window.fbDb || !window.fbAuth?.currentUser) {
+                    // Local Storage Fallback Mode
+                    const savedOrders = localStorage.getItem('inventory_orders');
+                    setOrders(savedOrders ? JSON.parse(savedOrders) : initialOrders);
+                    setAdmins([
+                        { id: '1', empId: 'ADMIN01', name: 'System Admin' },
+                        { id: '2', empId: 'A002', name: 'หัวหน้าคลังสินค้า' }
+                    ]);
+                    setIsSyncing(false);
+                    return;
+                }
+
+                const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-inventory-app';
+                
+                // 1. Sync Orders Real-time
+                const ordersRef = window.fbHelpers.collection(window.fbDb, 'artifacts', appId, 'public', 'data', 'orders');
+                const unsubOrders = window.fbHelpers.onSnapshot(ordersRef, (snapshot) => {
+                    const fetchedOrders = [];
+                    snapshot.forEach(doc => fetchedOrders.push(doc.data()));
+                    
+                    if (fetchedOrders.length === 0 && !window.hasSeededOrders) {
+                        window.hasSeededOrders = true;
+                        initialOrders.forEach(order => {
+                            window.fbHelpers.setDoc(window.fbHelpers.doc(window.fbDb, 'artifacts', appId, 'public', 'data', 'orders', order.id), order);
+                        });
+                    } else {
+                        fetchedOrders.sort((a, b) => b.id.localeCompare(a.id));
+                        setOrders(fetchedOrders);
+                    }
+                }, (error) => console.error("Orders snapshot error:", error));
+
+                // 2. Sync Admins Real-time
+                const adminsRef = window.fbHelpers.collection(window.fbDb, 'artifacts', appId, 'public', 'data', 'admins');
+                const unsubAdmins = window.fbHelpers.onSnapshot(adminsRef, (snapshot) => {
+                    const fetchedAdmins = [];
+                    snapshot.forEach(doc => fetchedAdmins.push(doc.data()));
+                    
+                    if (fetchedAdmins.length === 0 && !window.hasSeededAdmins) {
+                        window.hasSeededAdmins = true;
+                        const defaultAdmins = [
+                            { id: '1', empId: 'ADMIN01', name: 'System Admin' },
+                            { id: '2', empId: 'A002', name: 'หัวหน้าคลังสินค้า' }
+                        ];
+                        defaultAdmins.forEach(admin => {
+                            window.fbHelpers.setDoc(window.fbHelpers.doc(window.fbDb, 'artifacts', appId, 'public', 'data', 'admins', admin.id), admin);
+                        });
+                    } else {
+                        setAdmins(fetchedAdmins);
+                    }
+                    setIsSyncing(false);
+                }, (error) => console.error("Admin snapshot error:", error));
+
+                return () => { unsubOrders(); unsubAdmins(); };
+            }, [firebaseReady]);
+
+            const saveOrderToFirebase = async (order) => {
+                if (window.fbDb && window.fbAuth?.currentUser) {
+                    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-inventory-app';
+                    const docRef = window.fbHelpers.doc(window.fbDb, 'artifacts', appId, 'public', 'data', 'orders', order.id);
+                    await window.fbHelpers.setDoc(docRef, order);
+                } else {
+                    const newOrders = orders.some(o => o.id === order.id) ? orders.map(o => o.id === order.id ? order : o) : [order, ...orders];
+                    setOrders(newOrders);
+                    localStorage.setItem('inventory_orders', JSON.stringify(newOrders));
+                }
+            };
+
+            const deleteOrderFromFirebase = async (orderId) => {
+                if (window.fbDb && window.fbAuth?.currentUser) {
+                    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-inventory-app';
+                    const docRef = window.fbHelpers.doc(window.fbDb, 'artifacts', appId, 'public', 'data', 'orders', orderId);
+                    await window.fbHelpers.deleteDoc(docRef);
+                } else {
+                    const newOrders = orders.filter(o => o.id !== orderId);
+                    setOrders(newOrders);
+                    localStorage.setItem('inventory_orders', JSON.stringify(newOrders));
+                }
+            };
+
+            const handleSaveAdmin = async (admin) => {
+                if (window.fbDb && window.fbAuth?.currentUser) {
+                    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-inventory-app';
+                    const docRef = window.fbHelpers.doc(window.fbDb, 'artifacts', appId, 'public', 'data', 'admins', admin.id);
+                    await window.fbHelpers.setDoc(docRef, admin);
+                } else {
+                    setAdmins(admins.some(a => a.id === admin.id) ? admins.map(a => a.id === admin.id ? admin : a) : [...admins, admin]);
+                }
+            };
+
+            const handleDeleteAdmin = async (adminId) => {
+                if (window.fbDb && window.fbAuth?.currentUser) {
+                    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-inventory-app';
+                    const docRef = window.fbHelpers.doc(window.fbDb, 'artifacts', appId, 'public', 'data', 'admins', adminId);
+                    await window.fbHelpers.deleteDoc(docRef);
+                } else {
+                    setAdmins(admins.filter(a => a.id !== adminId));
+                }
+            };
 
             const filteredOrders = orders.filter(o => filter === 'ALL' || o.type === filter);
 
@@ -1195,13 +1338,9 @@
             };
 
             const handleSaveNewOrder = (savedOrder) => {
-                if (editingOrder) {
-                    setOrders(orders.map(o => o.id === savedOrder.id ? savedOrder : o));
-                    setEditingOrder(null);
-                } else {
-                    setOrders([savedOrder, ...orders]);
-                    setIsCreating(false);
-                }
+                saveOrderToFirebase(savedOrder);
+                if (editingOrder) setEditingOrder(null);
+                else setIsCreating(false);
             };
 
             const handleDeleteOrder = (id) => {
@@ -1210,18 +1349,12 @@
                     title: 'ยืนยันการลบ',
                     message: 'คุณต้องการลบใบเบิกนี้ใช่หรือไม่?',
                     onConfirm: () => {
-                        const updatedOrders = orders.filter(order => order.id !== id);
-                        setOrders(updatedOrders);
-                        localStorage.setItem('inventory_orders', JSON.stringify(updatedOrders));
+                        deleteOrderFromFirebase(id);
                         setDialog(null);
                     },
                     onCancel: () => setDialog(null)
                 });
             };
-
-            useEffect(() => {
-                localStorage.setItem('inventory_orders', JSON.stringify(orders));
-            }, [orders]);
 
             const handleLogin = (e) => {
                 e.preventDefault();
@@ -1243,6 +1376,18 @@
                 setCurrentUser(null);
                 setView('LIST');
             };
+
+            if (!firebaseReady || isSyncing) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
+                        <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden p-8 text-center animate-pulse">
+                            <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
+                            <h2 className="text-xl font-bold text-gray-800">กำลังเชื่อมต่อข้อมูล Real-time...</h2>
+                            <p className="text-gray-500 text-sm mt-2">โปรดรอสักครู่ ระบบกำลังซิงค์ข้อมูลคลังสินค้าล่าสุด</p>
+                        </div>
+                    </div>
+                );
+            }
 
             if (!currentUser) {
                 return (
@@ -1350,7 +1495,7 @@
                         {currentRole === 'ADMIN' && view === 'DASHBOARD' ? (
                             <Dashboard orders={orders} />
                         ) : currentRole === 'ADMIN' && view === 'ADMIN_MANAGEMENT' ? (
-                            <AdminManagement admins={admins} setAdmins={setAdmins} />
+                            <AdminManagement admins={admins} onSaveAdmin={handleSaveAdmin} onDeleteAdmin={handleDeleteAdmin} />
                         ) : (
                             <>
                                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
@@ -1514,7 +1659,10 @@
                             order={pickingOrder} 
                             onClose={() => setPickingOrder(null)}
                             onComplete={(orderId, pickerName) => {
-                                setOrders(orders.map(o => o.id === orderId ? {...o, status: 'COMPLETED', pickerName: pickerName} : o));
+                                const orderToUpdate = orders.find(o => o.id === orderId);
+                                if (orderToUpdate) {
+                                    saveOrderToFirebase({ ...orderToUpdate, status: 'COMPLETED', pickerName: pickerName });
+                                }
                                 setPickingOrder(null);
                             }}
                         />
