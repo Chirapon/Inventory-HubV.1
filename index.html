@@ -223,6 +223,32 @@
             return new Date(gregorianYear, parseInt(month) - 1, parseInt(day));
         };
 
+        const CustomDialog = ({ isOpen, type, title, message, onConfirm, onCancel }) => {
+            if (!isOpen) return null;
+            return (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-fade-in-up">
+                        <div className={`p-4 ${type === 'confirm' ? 'bg-amber-500' : 'bg-red-500'} text-white flex items-center gap-2`}>
+                            <h3 className="font-bold">{title}</h3>
+                        </div>
+                        <div className="p-6 text-gray-700 font-medium">
+                            {message}
+                        </div>
+                        <div className="bg-gray-50 p-4 flex justify-end gap-3 border-t border-gray-200">
+                            {type === 'confirm' && (
+                                <button onClick={onCancel} className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-100 transition-colors">
+                                    ยกเลิก
+                                </button>
+                            )}
+                            <button onClick={onConfirm} className={`px-4 py-2 rounded text-white transition-colors ${type === 'confirm' ? 'bg-amber-500 hover:bg-amber-600' : 'bg-red-500 hover:bg-red-600'}`}>
+                                ตกลง
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
         const Dashboard = ({ orders }) => {
             const [exportStartDate, setExportStartDate] = useState('');
             const [exportEndDate, setExportEndDate] = useState('');
@@ -467,6 +493,7 @@
 
         const PreviewModal = ({ order, onClose }) => {
             if (!order) return null;
+            const [dialog, setDialog] = useState(null);
 
             const handlePrint = () => {
                 const contentHtml = generateOrderContent(order);
@@ -494,7 +521,12 @@
                         printWindow.print();
                     }, 500);
                 } else {
-                    alert('ระบบไม่สามารถเปิดหน้าต่างพิมพ์ได้ กรุณาอนุญาต Pop-ups สำหรับเว็บไซต์นี้');
+                    setDialog({
+                        type: 'error',
+                        title: 'แจ้งเตือน',
+                        message: 'ระบบไม่สามารถเปิดหน้าต่างพิมพ์ได้ กรุณาอนุญาต Pop-ups สำหรับเว็บไซต์นี้',
+                        onConfirm: () => setDialog(null)
+                    });
                 }
             };
 
@@ -538,6 +570,8 @@
                             </button>
                         </div>
                     </div>
+                    
+                    <CustomDialog isOpen={!!dialog} {...dialog} />
                 </div>
             );
         };
@@ -548,6 +582,7 @@
             const [group, setGroup] = useState(initialOrder ? initialOrder.group : 'VSC');
             const [items, setItems] = useState(initialOrder ? initialOrder.items : []);
             const [pasteMessage, setPasteMessage] = useState('');
+            const [dialog, setDialog] = useState(null);
 
             const handlePaste = (e) => {
                 e.preventDefault();
@@ -625,7 +660,12 @@
                     setPasteMessage(`เพิ่มสำเร็จ ${newItems.length} รายการ!`);
                     setTimeout(() => setPasteMessage(''), 3000);
                 } else {
-                    alert('ไม่พบข้อมูลรายการสินค้าที่ถูกต้อง กรุณาตรวจสอบรูปแบบตารางที่ก๊อปปี้');
+                    setDialog({
+                        type: 'error',
+                        title: 'เกิดข้อผิดพลาด',
+                        message: 'ไม่พบข้อมูลรายการสินค้าที่ถูกต้อง กรุณาตรวจสอบรูปแบบตารางที่ก๊อปปี้',
+                        onConfirm: () => setDialog(null)
+                    });
                 }
             };
 
@@ -641,12 +681,12 @@
                 e.preventDefault();
                 
                 if (items.length === 0) {
-                    alert('กรุณาเพิ่มรายการสินค้าอย่างน้อย 1 รายการ');
+                    setDialog({ type: 'error', title: 'แจ้งเตือน', message: 'กรุณาเพิ่มรายการสินค้าอย่างน้อย 1 รายการ', onConfirm: () => setDialog(null) });
                     return;
                 }
                 
                 if (items.some(item => !item.name.trim())) {
-                    alert('กรุณาระบุชื่อสินค้าให้ครบถ้วนทุกบรรทัด');
+                    setDialog({ type: 'error', title: 'แจ้งเตือน', message: 'กรุณาระบุชื่อสินค้าให้ครบถ้วนทุกบรรทัด', onConfirm: () => setDialog(null) });
                     return;
                 }
 
@@ -659,17 +699,14 @@
 
                 const prefix = type === 'SALE' ? 'SO-' : type === 'PRODUCTION' ? 'PRD-' : type === 'SAMPLE' ? 'SMP-' : 'TR-';
                 
-                // --- ระบบรันเลขเอกสารอัตโนมัติ (Sequential ID Generation) ---
                 let finalDocumentId = '';
                 if (initialOrder) {
-                    finalDocumentId = initialOrder.id; // กรณีแก้ไข ใช้ ID เดิม
+                    finalDocumentId = initialOrder.id;
                 } else {
-                    // กรองเอาเฉพาะเอกสารประเภทเดียวกัน
                     const typeOrders = orders.filter(o => o.type === type);
-                    let lastIdNumber = 0; // ค่าเริ่มต้นถ้าไม่มีข้อมูล
+                    let lastIdNumber = 0; 
                     
                     if (typeOrders.length > 0) {
-                        // ดึงเฉพาะตัวเลขจาก ID แล้วหาค่าสูงสุด (Max)
                         const numericIds = typeOrders.map(o => {
                             const numericPart = parseInt(o.id.replace(prefix, ''), 10);
                             return isNaN(numericPart) ? 0 : numericPart;
@@ -678,10 +715,8 @@
                     }
                     
                     const nextIdNumber = lastIdNumber + 1;
-                    // สร้าง ID ใหม่ และเติม 0 ข้างหน้าให้ครบ 4 หลัก (เช่น SO-0001, PRD-0002)
                     finalDocumentId = `${prefix}${nextIdNumber.toString().padStart(4, '0')}`;
                 }
-                // --------------------------------------------------------
 
                 const now = new Date();
                 const thaiYear = now.getFullYear() + 543;
@@ -740,7 +775,6 @@
                                         <option value="VSI">VSI</option>
                                         <option value="อื่นๆ">อื่นๆ</option>
                                         <option value="-">ไม่ระบุ (-)</option>
-                                        {/* หากมีค่า group เดิมที่ไม่อยู่ในลิสต์ ให้แสดงขึ้นมาด้วย */}
                                         {group !== 'VSC' && group !== 'Internal' && group !== 'External' && group !== 'Affiliate' && group !== '-' && (
                                             <option value={group}>{group}</option>
                                         )}
@@ -845,6 +879,8 @@
                             </div>
                         </form>
                     </div>
+                    
+                    <CustomDialog isOpen={!!dialog} {...dialog} />
                 </div>
             );
         };
@@ -852,6 +888,7 @@
         const PickingModal = ({ order, onClose, onComplete }) => {
             const [pickerName, setPickerName] = useState('');
             const [pickedItems, setPickedItems] = useState([]);
+            const [dialog, setDialog] = useState(null);
 
             const handleToggleItem = (index) => {
                 setPickedItems(prev => 
@@ -872,8 +909,14 @@
             const progress = order.items.length === 0 ? 0 : Math.round((pickedItems.length / order.items.length) * 100);
 
             const handleComplete = () => {
-                if(!pickerName.trim()) { alert('กรุณาระบุชื่อผู้จัดสินค้า'); return; }
-                if(!isAllPicked) { alert('กรุณาตรวจสอบและจัดสินค้าให้ครบทุกรายการ'); return; }
+                if(!pickerName.trim()) { 
+                    setDialog({ type: 'error', title: 'แจ้งเตือน', message: 'กรุณาระบุชื่อผู้จัดสินค้า', onConfirm: () => setDialog(null) }); 
+                    return; 
+                }
+                if(!isAllPicked) { 
+                    setDialog({ type: 'error', title: 'แจ้งเตือน', message: 'กรุณาตรวจสอบและจัดสินค้าให้ครบทุกรายการ', onConfirm: () => setDialog(null) }); 
+                    return; 
+                }
                 onComplete(order.id, pickerName);
             };
             
@@ -986,6 +1029,8 @@
                             </button>
                         </div>
                     </div>
+                    
+                    <CustomDialog isOpen={!!dialog} {...dialog} />
                 </div>
             );
         };
@@ -993,6 +1038,7 @@
         const AdminManagement = ({ admins, setAdmins }) => {
             const [isEditing, setIsEditing] = useState(false);
             const [currentAdmin, setCurrentAdmin] = useState({ id: '', empId: '', name: '' });
+            const [dialog, setDialog] = useState(null);
 
             const handleSave = (e) => {
                 e.preventDefault();
@@ -1002,7 +1048,7 @@
                     setAdmins(admins.map(a => a.id === currentAdmin.id ? currentAdmin : a));
                 } else {
                     if (admins.some(a => a.empId === currentAdmin.empId)) {
-                        alert('รหัสพนักงานนี้มีในระบบแล้ว!');
+                        setDialog({ type: 'error', title: 'ข้อผิดพลาด', message: 'รหัสพนักงานนี้มีในระบบแล้ว!', onConfirm: () => setDialog(null) });
                         return;
                     }
                     setAdmins([...admins, { ...currentAdmin, id: Date.now().toString() }]);
@@ -1017,9 +1063,16 @@
             };
 
             const handleDelete = (id) => {
-                if(confirm('คุณแน่ใจหรือไม่ที่จะลบสิทธิ์ผู้ดูแลระบบของพนักงานท่านนี้?')) {
-                    setAdmins(admins.filter(a => a.id !== id));
-                }
+                setDialog({
+                    type: 'confirm',
+                    title: 'ยืนยันการลบ',
+                    message: 'คุณแน่ใจหรือไม่ที่จะลบสิทธิ์ผู้ดูแลระบบของพนักงานท่านนี้?',
+                    onConfirm: () => {
+                        setAdmins(admins.filter(a => a.id !== id));
+                        setDialog(null);
+                    },
+                    onCancel: () => setDialog(null)
+                });
             };
 
             return (
@@ -1099,12 +1152,13 @@
                             </tbody>
                         </table>
                     </div>
+                    
+                    <CustomDialog isOpen={!!dialog} {...dialog} />
                 </div>
             );
         };
 
         const App = () => {
-            // โหลดข้อมูลเริ่มต้นจาก localStorage ถ้ามีข้อมูลเก่าเซฟไว้ (ถ้าไม่มีให้ใช้ initialOrders)
             const [orders, setOrders] = useState(() => {
                 const savedOrders = localStorage.getItem('inventory_orders');
                 return savedOrders ? JSON.parse(savedOrders) : initialOrders;
@@ -1120,8 +1174,8 @@
             ]);
             const [currentUser, setCurrentUser] = useState(null);
             const [loginInput, setLoginInput] = useState('');
-            
             const [view, setView] = useState('LIST');
+            const [dialog, setDialog] = useState(null);
 
             const filteredOrders = orders.filter(o => filter === 'ALL' || o.type === filter);
 
@@ -1151,21 +1205,20 @@
             };
 
             const handleDeleteOrder = (id) => {
-                // 1. ถามยืนยันก่อนลบ
-                if (!window.confirm("คุณต้องการลบใบเบิกนี้ใช่หรือไม่?")) return;
-
-                // 2. กรองเอาเฉพาะใบเบิกที่ "ไม่ได้" มี id ตรงกับที่ถูกกดลบ
-                const updatedOrders = orders.filter(order => order.id !== id);
-                
-                // 3. อัปเดต State ของรายการใบเบิก
-                setOrders(updatedOrders);
-
-                // 4. บันทึกข้อมูลใหม่ลงไปใน localStorage ทันที
-                localStorage.setItem('inventory_orders', JSON.stringify(updatedOrders));
+                setDialog({
+                    type: 'confirm',
+                    title: 'ยืนยันการลบ',
+                    message: 'คุณต้องการลบใบเบิกนี้ใช่หรือไม่?',
+                    onConfirm: () => {
+                        const updatedOrders = orders.filter(order => order.id !== id);
+                        setOrders(updatedOrders);
+                        localStorage.setItem('inventory_orders', JSON.stringify(updatedOrders));
+                        setDialog(null);
+                    },
+                    onCancel: () => setDialog(null)
+                });
             };
 
-            // อัปเดต localStorage อัตโนมัติทุกครั้งที่ orders มีการเปลี่ยนแปลง 
-            // (ครอบคลุมทั้งตอนสร้างใหม่, แก้ไข, และตอนกดจัดสินค้าเสร็จสิ้น)
             useEffect(() => {
                 localStorage.setItem('inventory_orders', JSON.stringify(orders));
             }, [orders]);
@@ -1291,6 +1344,7 @@
                         </div>
                     </nav>
 
+                    {}
                     <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 no-print">
                         
                         {currentRole === 'ADMIN' && view === 'DASHBOARD' ? (
@@ -1465,7 +1519,8 @@
                             }}
                         />
                     )}
-
+                    
+                    <CustomDialog isOpen={!!dialog} {...dialog} />
                 </div>
             );
         };
